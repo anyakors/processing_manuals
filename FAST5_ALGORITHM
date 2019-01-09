@@ -1,0 +1,82 @@
+# ---------------------------------------- preliminary ----------------------------------------
+
+# Instructions for changing the script of MinKNOW to allow popup boxes with more advanced options: 
+# https://community.nanoporetech.com/protocols/experiment-companion-minknow/v/mke_1013_v1_revai_11apr2016/editing-protocol-scripts?search_term=options+for+advanced+users
+
+# After reads are obtained (most likely new reads are in /var/lib/MinKNOW/data/) you can check some of the fast5 files for the structure or save datasets from them:
+
+> h5ls -r path/to/file.fast5
+
+# flag r -- recursive, so all the embedded folders are shown
+
+# To print all the datasets in the fast5 file in the command prompt
+
+> h5dump path/to/file.fast5
+
+# To save the signal data from fast5 to the file out.bin (-w 1 -- column width = 1, -d stands for "dataset" contained in the following directory inside the fast5 file, note that Read_NNN 
+# has a specific number, same as the read number of the fast5 file, -o output file)
+
+> h5dump -w 1 -d /Raw/Reads/Read_1674/Signal/ -o out.bin path/to/read_1674_ch_178_strand.fast5 
+
+# and then you can plot the file out.bin using the plot.py script in the same folder
+
+# ---------------------------------------- basecalling ----------------------------------------
+
+# there are two sample commands below for the basecalling 
+
+> read_fast5_basecaller.py --flowcell FLO-MIN107 --kit SQK-RNA001 --output_format fast5,fastq --input ./fast5/ -r --save_path alb_rna3 --worker_threads 4 -q 0 --pipeline.min_qscore_1d=5.0
+
+> read_fast5_basecaller.py --flowcell FLO-MIN107 --kit SQK-RAD004 --output_format fast5,fastq --input ./0/ -r --save_path alb_lambda --worker_threads 4 -q 0 
+
+
+# Now we need to enter the conda virtual environment as all the libraries for the mapping are installed there, isolated
+
+> source activate ont_nanoraw
+
+#if we haven't done this before, we need to index the reference genome
+
+> bwa index hg38.genome.fa 
+
+
+
+# Next step -- mapping. minimap2 reference: https://lh3.github.io/minimap2/minimap2.html#4
+# First -- mapping the genome reference that you'll be using on itself. I don't know what for. The file ending with .fa will be taken and the file .mmi will be generated
+
+> minimap2 -d hg38.genome.mmi hg38.genome.fa 
+
+#Then -- mapping of the reads from the summary .fastq file that we've received after rows 27 or 29 (the one that contains all the fastq sequences of basecalled reads. 
+#It will be created in the working folder after basecalling and will look something like fastq_runid_d36e0c541013f76a286539098a672448c978706a.fastq)
+
+#for DNA
+
+> minimap2 -t 7 -ax map-ont -k14 -uf hg38.genome.mmi fastq_runid_d36e0c541013f76a286539098a672448c978706a.fastq | samtools view -Sb -F 1284 - | samtools sort - > reads.aln_hg38.bam
+
+#for RNA
+
+> minimap2 -t 2 -ax splice -k14 -uf hg38.genome.mmi fastq_runid_d36e0c541013f76a286539098a672448c978706a.fastq | samtools sort - > reads_dna.aln_hg38.bam
+
+# checking the stats
+
+> samtools flagstat reads.aln_hg38.bam 
+
+# indexing the created mapping file
+
+> samtools index reads.aln_hg38.bam
+
+# converting the extensions: .bam to .bed, .bam to .bdg. These are just different types of coverage representation
+
+> bedtools bamtobed -i reads.aln_hg38.bam > reads.aln_hg38.bam.bed
+
+> bedtools genomecov -ibam reads.aln_hg38.bam -bg > reads.aln_hg38.bam.bdg
+
+# after this you may run IGV (it's in /home/Downloads/igv.sh -- double-click and running in terminal should work) and open genome along with .bdg, .bed and .bam files for visualization.
+
+
+DNA
+
+minimap2 -t 7 -ax map-ont hg38.genome.fa ./0/ | samtools view -Sb -f 4 > reads.aln_hg38.bam
+
+minimap2 -t 7 -ax map-ont lambda_phage.mmi .fastq | samtools view -Sb -f 4 - > reads.aln_lambda.bam
+
+RNA
+

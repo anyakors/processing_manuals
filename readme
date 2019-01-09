@@ -1,0 +1,26 @@
+The script for MD simulation:
+
+1) Prepare your molecule in PyMOL or whatever. Get rid of the B solutions (like when you get 2 solutions of one residue -- DG A and DG B inside one file after x-ray). Try to get everything in order -- consistent numbers of residues and no confusion and doubling in the atom names. 
+If you need to add ions, you can use either PyMOL and manual operations (you should find the ions somewhere else and copypaste them, then drag where you want them to be), or the intrinsic command "edit" when you will open your file in xleap. It's more functional but not user-friendly at all. And probably it won't work properly through ssh.
+
+2) Transfer your file(s) to telomere2 and copy the folder "mini" to the same directory. Go to your project directory where pdb is contained.
+Open xleap from command line: it's just " > xleap".
+In xleap 
+- clear residue map (it helped me to reduce errors much): "> clearpdbresmap"
+
+> loadoff tRNA.lib
+
+> loadamberparams tRNA.frcmod
+
+> loadamberparams frcmod.ionsjc_tip3p
+
+- open your file: "> f1 = loadpdb "yourfile.pdb" " -- it will seek file in the last active directory in unix shell.
+- add ions if you want to: "> addions f1 K+ 0" -- add K+ until the overall charge is 0. You may add Na+ or NH4.
+- solvate it: "> solvatebox f1 TIP3PBOX 9.0" or solvateoct, last parameter is the cutoff -- the smallest distance to the box "wall" from your atoms.
+- save your top and crd files: "> saveamberparm f1 name1.top name2.crd" -- if there are some critical inaccuracies in the pdb file, it won't save. That's the trickiest part -- to sort it out.
+- "> quit"
+
+3) Open your "mini" folder and check all the parameters you need. The bash file run_MHE.sh will be executed, so track the filenames in this file, everything should be consistent. There are 6 minimizations -- mini.in -- initial rough minimization, then heating procedure heat.in, then a sequence of 5 minimizations + equilibrations with different precision. It prepares the file for MD itself -- md0.in, it takes main calc time. In md0.in you can change the number of iterations -- nstlim=1000 corresponds to 1ps, 1000000 to 1ns and so on. Normally you don't need to change anything else, it seems that this procedure is quite established. You can edit files with the command "> vi filename" and then push "i" inside VIM editor to enter edit mode; when you're finished with editing -- press Esc once and then :wq and enter to write and quit.
+
+4) Before running run_MHE, take a note that files are in proper folders: you can put your files in "mini" folder and address them just as file.top or in the uplevel folder - ../file.top.
+Run command "> screen" in the shell. Press enter after instruction and now you can "> bash run_MHE.sh". If you do it with "screen", you may be certain to close ssh because screen detaches the process from your local ssh and runs it independently on the target computer.
